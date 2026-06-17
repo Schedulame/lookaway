@@ -35,7 +35,7 @@ export function renderStatsPanel(): void {
 
   if (todayData) {
     const activeH  = (todayData.totalActiveMs / 3600000).toFixed(1)
-    const awayH    = (todayData.totalAwayMs   / 3600000).toFixed(1)
+    const awayMin  = Math.round(todayData.totalAwayMs / 60000)
     const eyeDone  = todayData.eyeBreaksCompleted
     const lbDone   = todayData.longBreaksCompleted
 
@@ -56,7 +56,7 @@ export function renderStatsPanel(): void {
             <span class="stat-label">Active</span>
           </div>
           <div class="stat-cell">
-            <span class="stat-value">${awayH}h</span>
+            <span class="stat-value">${awayMin}m</span>
             <span class="stat-label">Away</span>
           </div>
         </div>
