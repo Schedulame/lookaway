@@ -17,10 +17,7 @@ export function onFaceDetected(): void {
     presentCount = 0
     const durationMs = absenceStartedAt !== null ? Date.now() - absenceStartedAt : 0
     absenceStartedAt = null
-    emit('FACE_PRESENT')
-    if (durationMs > 0) {
-      // Presence restored — callers handle the duration via FACE_ABSENT that already fired
-    }
+    emit('FACE_PRESENT', { durationMs })
   }
 }
 

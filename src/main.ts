@@ -1,7 +1,6 @@
 import './style.css'
-import { NOTIFICATION_TAGS, RE_NOTIFY_DELAY_MS, WELCOME_BACK_SHOW_MS } from './constants'
+import { EYE_RESET_ABSENCE_MS, NOTIFICATION_TAGS, RE_NOTIFY_DELAY_MS, WELCOME_BACK_SHOW_MS } from './constants'
 import { startCamera } from './camera/cameraManager'
-import { getAbsenceDurationMs } from './camera/facePresence'
 import {
   dismissNotification,
   requestPermission,
@@ -98,17 +97,20 @@ worker.addEventListener('message', (e: MessageEvent) => {
 })
 
 // ── Face presence events ───────────────────────────────────────────────────────
-on('FACE_PRESENT', () => {
-  const absenceDurationMs = getAbsenceDurationMs()
+on('FACE_PRESENT', ({ durationMs }) => {
   const settings = getSettings()
 
   updateAppState({
     facePresent: true,
-    lastAbsenceDurationMs: absenceDurationMs > 0 ? absenceDurationMs : null,
-    showWelcomeBack: absenceDurationMs >= settings.awayThresholdMs,
+    lastAbsenceDurationMs: durationMs > 0 ? durationMs : null,
+    showWelcomeBack: durationMs >= settings.awayThresholdMs,
   })
 
-  resumeEyeTimer()
+  if (durationMs >= EYE_RESET_ABSENCE_MS) {
+    resetEyeTimer()
+  } else {
+    resumeEyeTimer()
+  }
   resumeBreakTimer()
   worker.postMessage({ type: 'RESUME' })
 
@@ -129,9 +131,8 @@ on('AWAY_THRESHOLD_REACHED', ({ totalAwayMs }) => {
   recordEvent({ type: 'AWAY_TIME_ELAPSED', ms: totalAwayMs })
 
   const settings = getSettings()
-  const absenceMs = getAbsenceDurationMs()
 
-  if (absenceMs >= settings.minBreakDurationMs) {
+  if (totalAwayMs >= settings.minBreakDurationMs) {
     onLongAbsenceDetected()
     dismissNotification(NOTIFICATION_TAGS.BREAK)
     updateAppState({ breakTimer: getBreakTimerState() })

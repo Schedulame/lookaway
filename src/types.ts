@@ -48,7 +48,7 @@ export type StatEvent =
   | { type: 'AWAY_TIME_ELAPSED'; ms: number }
 
 export type EventMap = {
-  FACE_PRESENT: void
+  FACE_PRESENT: { durationMs: number }
   FACE_ABSENT: { durationMs: number }
   AWAY_THRESHOLD_REACHED: { totalAwayMs: number }
   NOTIFICATION_DISMISSED: { tag: string }

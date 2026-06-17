@@ -19,6 +19,8 @@ export const WORKER_TICK_MS = 250
 export const STATS_MAX_DAYS = 8
 export const WELCOME_BACK_SHOW_MS = 4000
 
+export const EYE_RESET_ABSENCE_MS = 20 * 1000
+
 export const PRESENCE_DETECT_FRAMES = 3
 export const PRESENCE_ABSENT_FRAMES = 2
 
