@@ -18,13 +18,13 @@ export function initSettingsPanel(): void {
 
     const current = getSettings()
     const next: Settings = {
-      eyeIntervalMs: parse('eyeIntervalMin', 1, 120, current.eyeIntervalMs / 60000) * 60000,
-      eyeCountdownMs: parse('eyeCountdownSec', 5, 120, current.eyeCountdownMs / 1000) * 1000,
-      breakIntervalMs: parse('breakIntervalMin', 10, 480, current.breakIntervalMs / 60000) * 60000,
+      eyeIntervalMs: parse('eyeIntervalMin', 1, 9999, current.eyeIntervalMs / 60000) * 60000,
+      eyeCountdownMs: parse('eyeCountdownSec', 1, 9999, current.eyeCountdownMs / 1000) * 1000,
+      breakIntervalMs: parse('breakIntervalMin', 1, 9999, current.breakIntervalMs / 60000) * 60000,
       minBreakDurationMs:
-        parse('minBreakDurationMin', 1, 60, current.minBreakDurationMs / 60000) * 60000,
+        parse('minBreakDurationMin', 1, 9999, current.minBreakDurationMs / 60000) * 60000,
       awayThresholdMs:
-        parse('awayThresholdMin', 1, 30, current.awayThresholdMs / 60000) * 60000,
+        parse('awayThresholdMin', 1, 9999, current.awayThresholdMs / 60000) * 60000,
     }
     saveSettings(next)
     showSaved()
