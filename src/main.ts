@@ -12,7 +12,6 @@ import { recordEvent } from './state/stats'
 import { getAppState, subscribeAppState, updateAppState } from './state/appState'
 import {
   getBreakTimerState,
-  onBreakNotificationDismissed,
   onLongAbsenceDetected,
   pauseBreakTimer,
   resumeBreakTimer,
@@ -83,6 +82,7 @@ subscribeAppState((state) => {
 
 // ── Absence tracking (for per-absence deduplication of stats) ─────────────────
 let absenceTotalMs = 0
+let absenceActualStartMs = 0
 let eyeBreakRecordedThisAbsence = false
 let longBreakRecordedThisAbsence = false
 
@@ -105,6 +105,12 @@ worker.addEventListener('message', (e: MessageEvent) => {
 // ── Face presence events ───────────────────────────────────────────────────────
 on('FACE_PRESENT', ({ durationMs }) => {
   const settings = getSettings()
+
+  const exactAbsenceMs = absenceActualStartMs > 0 ? Date.now() - absenceActualStartMs : 0
+
+  if (exactAbsenceMs >= settings.awayThresholdMs) {
+    recordEvent({ type: 'AWAY_TIME_ELAPSED', ms: exactAbsenceMs })
+  }
 
   updateAppState({
     facePresent: true,
@@ -132,6 +138,7 @@ on('FACE_PRESENT', ({ durationMs }) => {
 
 on('FACE_ABSENT', () => {
   absenceTotalMs = 0
+  absenceActualStartMs = Date.now()
   eyeBreakRecordedThisAbsence = false
   longBreakRecordedThisAbsence = false
   updateAppState({ facePresent: false })
@@ -143,7 +150,6 @@ on('FACE_ABSENT', () => {
 
 on('AWAY_THRESHOLD_REACHED', ({ totalAwayMs }) => {
   absenceTotalMs += totalAwayMs
-  recordEvent({ type: 'AWAY_TIME_ELAPSED', ms: totalAwayMs })
 
   const settings = getSettings()
 
@@ -211,11 +217,6 @@ on('BREAK_COMPLETED', () => {
   updateAppState({ breakTimer: getBreakTimerState() })
 })
 
-on('BREAK_SKIPPED', () => {
-  recordEvent({ type: 'LONG_BREAK_SKIPPED' })
-  clearBadge()
-  updateAppState({ breakTimer: getBreakTimerState() })
-})
 
 // ── Notification dismiss → timer transitions ───────────────────────────────────
 on('NOTIFICATION_DISMISSED', ({ tag }) => {
@@ -224,9 +225,7 @@ on('NOTIFICATION_DISMISSED', ({ tag }) => {
     clearBadge()
     updateAppState({ eyeTimer: getEyeTimerState() })
   } else if (tag === NOTIFICATION_TAGS.BREAK) {
-    onBreakNotificationDismissed()
     clearBadge()
-    updateAppState({ breakTimer: getBreakTimerState() })
   }
 })
 
