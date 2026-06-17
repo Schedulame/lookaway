@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <script>
+      // Register combined SW (COOP/COEP + notifications). Reload once if headers not yet active.
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js').then((reg) => {
+          if (!crossOriginIsolated) {
+            reg.update().then(() => location.reload())
+          }
+        })
+      }
+    </script>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lookaway</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+
+    <div id="secure-warning" style="display:none">
+      ⚠️ Camera access requires HTTPS. The app will run as timer-only without face detection.
+    </div>
+
+    <div id="notif-status" class="notif-status-bar" style="display:none"></div>
+
+    <header class="app-header">
+      <span class="app-title">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-2px;margin-right:7px">
+          <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/>
+          <circle cx="12" cy="12" r="3"/>
+        </svg>Lookaway</span>
+      <nav class="nav-tabs">
+        <button class="nav-tab active" data-panel="status">Status</button>
+        <button class="nav-tab" data-panel="settings">Settings</button>
+        <button class="nav-tab" data-panel="stats">Stats</button>
+      </nav>
+      <div class="header-right">
+        <div class="header-presence">
+          <div class="presence-dot pending" id="presence-dot"></div>
+          <span id="presence-label">Initializing...</span>
+        </div>
+        <button id="pip-btn" class="pip-btn" title="Float widget on screen">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="20" height="16" rx="2"/><rect x="12" y="11" width="8" height="6" rx="1" fill="currentColor" stroke="none"/></svg>
+          <span id="pip-btn-label">Float</span>
+        </button>
+      </div>
+    </header>
+
+    <div id="prism-bg" class="prism-bg"></div>
+
+    <!-- STATUS PANEL -->
+    <section id="panel-status" class="panel active">
+
+      <div id="welcome-back" class="hidden"></div>
+
+      <div id="camera-request" style="display:none">
+        <h3>📷 Camera Access</h3>
+        <p>Lookaway uses your webcam to detect when you're at your desk. All processing happens locally — no video ever leaves your device.</p>
+        <button class="btn-primary" id="grant-camera-btn">Allow Camera</button>
+      </div>
+
+      <!-- Hero: concentric rings + character -->
+      <div class="hero-composition">
+        <svg class="rings-svg" viewBox="0 0 330 330" xmlns="http://www.w3.org/2000/svg">
+          <!-- Outer ring: long break timer (r=150, C=942.48) -->
+          <circle class="ring-track" cx="165" cy="165" r="150"/>
+          <circle class="ring-arc ring-arc--break" id="break-arc"
+            cx="165" cy="165" r="150"
+            stroke-dasharray="942.48" stroke-dashoffset="942.48"
+            transform="rotate(-90 165 165)"/>
+          <!-- Inner ring: eye break timer (r=120, C=753.98) -->
+          <circle class="ring-track" cx="165" cy="165" r="120"/>
+          <circle class="ring-arc ring-arc--eye" id="eye-arc"
+            cx="165" cy="165" r="120"
+            stroke-dasharray="753.98" stroke-dashoffset="753.98"
+            transform="rotate(-90 165 165)"/>
+        </svg>
+        <div class="hero-char" id="main-char"></div>
+      </div>
+
+      <!-- Timer labels -->
+      <div class="hero-labels">
+        <div class="hero-label hero-label--eye">
+          <span class="label-time" id="eye-time">--:--</span>
+          <span class="label-desc" id="eye-phase">eye break</span>
+        </div>
+        <div class="hero-divider"></div>
+        <div class="hero-label hero-label--break">
+          <span class="label-time" id="break-time">--</span>
+          <span class="label-desc" id="break-phase">long break</span>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- SETTINGS PANEL -->
+    <section id="panel-settings" class="panel">
+      <form class="settings-form" id="settings-form">
+
+        <div class="settings-group">
+          <div class="settings-group-header">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+            Eye Break
+          </div>
+          <div class="settings-rows">
+            <div class="setting-row">
+              <div class="setting-label-wrap">
+                <label for="eyeIntervalMin">Reminder interval</label>
+                <div class="setting-help">
+                  <span class="help-btn">?</span>
+                  <div class="help-tooltip">How often you'll be reminded to rest your eyes. Following the 20-20-20 rule, every 20 minutes is the standard recommendation.</div>
+                </div>
+              </div>
+              <div class="setting-input-wrap">
+                <input type="number" id="eyeIntervalMin" name="eyeIntervalMin" min="1" max="120" />
+                <span class="setting-unit">min</span>
+              </div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-label-wrap">
+                <label for="eyeCountdownSec">Countdown duration</label>
+                <div class="setting-help">
+                  <span class="help-btn">?</span>
+                  <div class="help-tooltip">How many seconds to look at something 20 feet (6 m) away during each eye break. 20 seconds is the standard.</div>
+                </div>
+              </div>
+              <div class="setting-input-wrap">
+                <input type="number" id="eyeCountdownSec" name="eyeCountdownSec" min="5" max="120" />
+                <span class="setting-unit">sec</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <div class="settings-group-header">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
+            Long Break
+          </div>
+          <div class="settings-rows">
+            <div class="setting-row">
+              <div class="setting-label-wrap">
+                <label for="breakIntervalMin">Break interval</label>
+                <div class="setting-help">
+                  <span class="help-btn">?</span>
+                  <div class="help-tooltip">How long you work before being reminded to take a long break. 90 minutes matches a typical focus block.</div>
+                </div>
+              </div>
+              <div class="setting-input-wrap">
+                <input type="number" id="breakIntervalMin" name="breakIntervalMin" min="10" max="480" />
+                <span class="setting-unit">min</span>
+              </div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-label-wrap">
+                <label for="minBreakDurationMin">Minimum break duration</label>
+                <div class="setting-help">
+                  <span class="help-btn">?</span>
+                  <div class="help-tooltip">If you step away for at least this long, it counts as a completed long break and the timer resets automatically.</div>
+                </div>
+              </div>
+              <div class="setting-input-wrap">
+                <input type="number" id="minBreakDurationMin" name="minBreakDurationMin" min="1" max="60" />
+                <span class="setting-unit">min</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <div class="settings-group-header">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            Presence Detection
+          </div>
+          <div class="settings-rows">
+            <div class="setting-row">
+              <div class="setting-label-wrap">
+                <label for="awayThresholdMin">Away threshold</label>
+                <div class="setting-help">
+                  <span class="help-btn">?</span>
+                  <div class="help-tooltip">If the webcam doesn't detect you for this long, all timers pause and reset. Prevents false reminders when you return from a break.</div>
+                </div>
+              </div>
+              <div class="setting-input-wrap">
+                <input type="number" id="awayThresholdMin" name="awayThresholdMin" min="1" max="30" />
+                <span class="setting-unit">min</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <button type="submit" class="btn-primary" id="settings-save-btn">Save Settings</button>
+      </form>
+    </section>
+
+    <!-- STATS PANEL -->
+    <section id="panel-stats" class="panel">
+      <div class="stats-topbar">
+        <span class="stats-title">Statistics</span>
+        <button class="btn-danger" id="stats-reset-btn">Reset all</button>
+      </div>
+      <div id="stats-container"></div>
+    </section>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

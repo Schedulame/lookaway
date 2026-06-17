@@ -1,0 +1,336 @@
+import './style.css'
+import { NOTIFICATION_TAGS, RE_NOTIFY_DELAY_MS, WELCOME_BACK_SHOW_MS } from './constants'
+import { startCamera } from './camera/cameraManager'
+import { getAbsenceDurationMs } from './camera/facePresence'
+import {
+  dismissNotification,
+  requestPermission,
+  showNotification,
+} from './notifications/notificationManager'
+import { getSettings } from './state/settings'
+import { recordEvent } from './state/stats'
+import { getAppState, subscribeAppState, updateAppState } from './state/appState'
+import {
+  getBreakTimerState,
+  onBreakNotificationDismissed,
+  onLongAbsenceDetected,
+  pauseBreakTimer,
+  resumeBreakTimer,
+  startBreakTimer,
+  tickBreakTimer,
+} from './timers/breakTimer'
+import {
+  getEyeTimerState,
+  onEyeNotificationDismissed,
+  pauseEyeTimer,
+  resetEyeTimer,
+  resumeEyeTimer,
+  startEyeTimer,
+  tickEyeTimer,
+} from './timers/eyeTimer'
+import TimerWorker from './timers/timer.worker.ts?worker'
+import { clearBadge, incrementBadge } from './ui/tabBadge'
+import { hide as hideOverlay, showOverlay } from './ui/overlay'
+import { closePip, endPipEyeBreak, isPipOpen, openPip, startPipEyeBreak, updatePip } from './ui/pip'
+import { createCharacter, type CharacterInstance } from './ui/character'
+import { createPlasma } from './ui/plasma'
+import { initSettingsPanel } from './ui/panels/settingsPanel'
+import { renderStatusPanel } from './ui/panels/statusPanel'
+import { initStatsPanel, renderStatsPanel } from './ui/panels/statsPanel'
+import { on } from './utils/eventBus'
+
+// ── Secure context warning ─────────────────────────────────────────────────────
+if (!window.isSecureContext) {
+  const el = document.getElementById('secure-warning')
+  if (el) el.style.display = 'block'
+}
+
+// ── Nav tabs ───────────────────────────────────────────────────────────────────
+document.querySelectorAll<HTMLButtonElement>('.nav-tab').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    const target = btn.dataset.panel
+    document.querySelectorAll('.nav-tab').forEach((b) => b.classList.remove('active'))
+    document.querySelectorAll('.panel').forEach((p) => p.classList.remove('active'))
+    btn.classList.add('active')
+    document.getElementById(`panel-${target}`)?.classList.add('active')
+    if (target === 'stats') renderStatsPanel()
+  })
+})
+
+// ── Settings + stats panels ────────────────────────────────────────────────────
+initSettingsPanel()
+initStatsPanel()
+
+// ── Character (main page) ──────────────────────────────────────────────────────
+let mainChar: CharacterInstance | null = null
+
+function computeFatiguePct(): number {
+  const { breakTimer } = getAppState()
+  const settings = getSettings()
+  if (breakTimer.phase === 'NOTIFYING') return 100
+  if (breakTimer.phase === 'RUNNING' || breakTimer.phase === 'PAUSED')
+    return Math.min(100, (breakTimer.elapsedMs / settings.breakIntervalMs) * 100)
+  return 0
+}
+
+// ── App state → re-render status panel + PiP ──────────────────────────────────
+subscribeAppState((state) => {
+  renderStatusPanel(state)
+  if (isPipOpen()) updatePip(state)
+  mainChar?.setFatigue(computeFatiguePct())
+  mainChar?.setEyeAlert(state.eyeTimer.phase === 'NOTIFYING')
+})
+
+// ── Web Worker timer ───────────────────────────────────────────────────────────
+const worker = new TimerWorker()
+
+worker.addEventListener('message', (e: MessageEvent) => {
+  if (e.data.type !== 'TICK') return
+  const { deltaMs } = e.data as { deltaMs: number }
+
+  const appState = getAppState()
+  if (!appState.facePresent && appState.cameraStatus === 'active') return
+
+  const eyeState = tickEyeTimer(deltaMs)
+  const breakState = tickBreakTimer(deltaMs)
+  recordEvent({ type: 'ACTIVE_TIME_ELAPSED', ms: deltaMs })
+  updateAppState({ eyeTimer: eyeState, breakTimer: breakState })
+})
+
+// ── Face presence events ───────────────────────────────────────────────────────
+on('FACE_PRESENT', () => {
+  const absenceDurationMs = getAbsenceDurationMs()
+  const settings = getSettings()
+
+  updateAppState({
+    facePresent: true,
+    lastAbsenceDurationMs: absenceDurationMs > 0 ? absenceDurationMs : null,
+    showWelcomeBack: absenceDurationMs >= settings.awayThresholdMs,
+  })
+
+  resumeEyeTimer()
+  resumeBreakTimer()
+  worker.postMessage({ type: 'RESUME' })
+
+  if (getAppState().showWelcomeBack) {
+    setTimeout(() => updateAppState({ showWelcomeBack: false }), WELCOME_BACK_SHOW_MS)
+  }
+})
+
+on('FACE_ABSENT', () => {
+  updateAppState({ facePresent: false })
+  pauseEyeTimer()
+  pauseBreakTimer()
+  worker.postMessage({ type: 'PAUSE' })
+  updateAppState({ eyeTimer: getEyeTimerState(), breakTimer: getBreakTimerState() })
+})
+
+on('AWAY_THRESHOLD_REACHED', ({ totalAwayMs }) => {
+  recordEvent({ type: 'AWAY_TIME_ELAPSED', ms: totalAwayMs })
+
+  const settings = getSettings()
+  const absenceMs = getAbsenceDurationMs()
+
+  if (absenceMs >= settings.minBreakDurationMs) {
+    onLongAbsenceDetected()
+    dismissNotification(NOTIFICATION_TAGS.BREAK)
+    updateAppState({ breakTimer: getBreakTimerState() })
+  }
+
+  resetEyeTimer()
+  dismissNotification(NOTIFICATION_TAGS.EYE)
+  hideOverlay()
+  clearBadge()
+  updateAppState({ eyeTimer: getEyeTimerState() })
+})
+
+// ── Eye timer events ───────────────────────────────────────────────────────────
+on('EYE_REMINDER_FIRED', () => {
+  recordEvent({ type: 'EYE_REMINDER_RECEIVED' })
+  showNotification(
+    NOTIFICATION_TAGS.EYE,
+    '👁 Eye Break',
+    'Look at something 20 feet away for 20 seconds.',
+    RE_NOTIFY_DELAY_MS
+  )
+  updateAppState({ eyeTimer: getEyeTimerState() })
+})
+
+on('EYE_COUNTDOWN_STARTED', () => {
+  const settings = getSettings()
+  showOverlay(settings.eyeCountdownMs, () => {})
+  mainChar?.startEyeBreak()
+  startPipEyeBreak()
+})
+
+on('EYE_COUNTDOWN_COMPLETE', () => {
+  recordEvent({ type: 'EYE_BREAK_COMPLETED' })
+  hideOverlay()
+  clearBadge()
+  updateAppState({ eyeTimer: getEyeTimerState() })
+  mainChar?.endEyeBreak()
+  endPipEyeBreak()
+})
+
+// ── Break timer events ─────────────────────────────────────────────────────────
+on('BREAK_REMINDER_FIRED', () => {
+  recordEvent({ type: 'BREAK_REMINDER_RECEIVED' })
+  showNotification(
+    NOTIFICATION_TAGS.BREAK,
+    '☕ Time for a Break',
+    "You've been working for 90 minutes. Stand up and take a break!",
+    RE_NOTIFY_DELAY_MS
+  )
+  updateAppState({ breakTimer: getBreakTimerState() })
+})
+
+on('BREAK_COMPLETED', () => {
+  recordEvent({ type: 'LONG_BREAK_COMPLETED' })
+  clearBadge()
+  updateAppState({ breakTimer: getBreakTimerState() })
+})
+
+on('BREAK_SKIPPED', () => {
+  recordEvent({ type: 'LONG_BREAK_SKIPPED' })
+  clearBadge()
+  updateAppState({ breakTimer: getBreakTimerState() })
+})
+
+// ── Notification dismiss → timer transitions ───────────────────────────────────
+on('NOTIFICATION_DISMISSED', ({ tag }) => {
+  if (tag === NOTIFICATION_TAGS.EYE) {
+    onEyeNotificationDismissed()
+    clearBadge()
+    updateAppState({ eyeTimer: getEyeTimerState() })
+  } else if (tag === NOTIFICATION_TAGS.BREAK) {
+    onBreakNotificationDismissed()
+    clearBadge()
+    updateAppState({ breakTimer: getBreakTimerState() })
+  }
+})
+
+// ── Re-notify ──────────────────────────────────────────────────────────────────
+on('RE_NOTIFY', ({ tag }) => {
+  incrementBadge()
+  if (tag === NOTIFICATION_TAGS.EYE) {
+    showNotification(
+      NOTIFICATION_TAGS.EYE,
+      '👁 Eye Break — Still Waiting',
+      'Please look 20 feet away for 20 seconds!',
+      RE_NOTIFY_DELAY_MS
+    )
+  } else if (tag === NOTIFICATION_TAGS.BREAK) {
+    showNotification(
+      NOTIFICATION_TAGS.BREAK,
+      '☕ Break Reminder',
+      'Please take a break — you need it!',
+      RE_NOTIFY_DELAY_MS
+    )
+  }
+})
+
+// ── Notification permission bar ────────────────────────────────────────────────
+function renderNotifStatus(): void {
+  const el = document.getElementById('notif-status')
+  if (!el) return
+  const perm = 'Notification' in window ? Notification.permission : 'unsupported'
+  if (perm === 'granted') {
+    el.innerHTML = ''
+    el.style.display = 'none'
+  } else if (perm === 'denied') {
+    el.style.display = 'flex'
+    el.innerHTML = `
+      <span>🔕 Desktop notifications blocked.</span>
+      <span>Re-enable in your browser's site settings, then reload.</span>
+    `
+  } else {
+    el.style.display = 'flex'
+    el.innerHTML = `
+      <span>🔔 Desktop notifications are off.</span>
+      <button id="enable-notif-btn" class="btn-notif-enable">Enable desktop notifications</button>
+    `
+    document.getElementById('enable-notif-btn')?.addEventListener('click', async () => {
+      const granted = await requestPermission()
+      if (granted) renderNotifStatus()
+    })
+  }
+}
+
+// ── Camera + startup ───────────────────────────────────────────────────────────
+async function init() {
+  if (window.isSecureContext) {
+    await startCamera()
+  } else {
+    updateAppState({ cameraStatus: 'denied', facePresent: true })
+  }
+
+  const appState = getAppState()
+
+  if (appState.cameraStatus === 'denied' || appState.cameraStatus === 'error') {
+    updateAppState({ facePresent: true })
+    document.getElementById('camera-request')!.style.display = 'block'
+  }
+
+  document.getElementById('grant-camera-btn')?.addEventListener('click', async () => {
+    await startCamera()
+    const s = getAppState()
+    if (s.cameraStatus === 'active') {
+      document.getElementById('camera-request')!.style.display = 'none'
+    }
+  })
+
+  const prismContainer = document.getElementById('prism-bg')
+  if (prismContainer) {
+    createPlasma(prismContainer as HTMLElement, {
+      color: '#ffffff',
+      speed: 0.5,
+      direction: 'forward',
+      scale: 0.75,
+      opacity: 1.0,
+      mouseInteractive: false,
+      renderScale: 0.6,
+      maxFps: 30,
+    })
+  }
+
+  const charContainer = document.getElementById('main-char')
+  if (charContainer) mainChar = createCharacter(charContainer as HTMLElement, 100)
+
+  startEyeTimer()
+  startBreakTimer()
+  worker.postMessage({ type: 'START' })
+  updateAppState({ eyeTimer: getEyeTimerState(), breakTimer: getBreakTimerState() })
+
+  renderNotifStatus()
+
+  // ── PiP button ───────────────────────────────────────────────────────────────
+  const pipBtn = document.getElementById('pip-btn')
+  if (!('documentPictureInPicture' in window)) {
+    pipBtn?.setAttribute('title', 'Requires Chrome 116+')
+    pipBtn?.setAttribute('disabled', '')
+  } else {
+    pipBtn?.addEventListener('click', async () => {
+      if (isPipOpen()) {
+        closePip()
+        pipBtn!.classList.remove('active')
+        document.getElementById('pip-btn-label')!.textContent = 'Float'
+      } else {
+        const ok = await openPip()
+        if (ok) {
+          pipBtn!.classList.add('active')
+          document.getElementById('pip-btn-label')!.textContent = 'Floating'
+          updatePip(getAppState())
+          const poll = setInterval(() => {
+            if (!isPipOpen()) {
+              pipBtn!.classList.remove('active')
+              document.getElementById('pip-btn-label')!.textContent = 'Float'
+              clearInterval(poll)
+            }
+          }, 500)
+        }
+      }
+    })
+  }
+}
+
+init()
