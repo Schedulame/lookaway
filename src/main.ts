@@ -221,7 +221,7 @@ on('BREAK_REMINDER_FIRED', () => {
     `You've been working for ${min} minutes. Stand up and take a break!`,
     RE_NOTIFY_DELAY_MS
   )
-  updateAppState({ breakTimer: getBreakTimerState() })
+  updateAppState({ isOnBreak: true, breakTimer: getBreakTimerState() })
 })
 
 on('BREAK_COMPLETED', () => {
@@ -229,7 +229,7 @@ on('BREAK_COMPLETED', () => {
   longBreakRecordedThisAbsence = false
   recordEvent({ type: 'LONG_BREAK_COMPLETED' })
   clearBadge()
-  updateAppState({ breakProgressMs: 0, breakTimer: getBreakTimerState() })
+  updateAppState({ isOnBreak: false, breakProgressMs: 0, breakTimer: getBreakTimerState() })
 })
 
 
@@ -299,12 +299,13 @@ function renderNotifStatus(): void {
 
 // ── Live absence timers (update every second while away) ───────────────────────
 setInterval(() => {
-  if (!getAppState().facePresent) {
+  const appState = getAppState()
+  if (!appState.facePresent) {
     const perAbsenceMs = absenceActualStartMs > 0 ? Date.now() - absenceActualStartMs : 0
     const segmentMs    = breakSegmentStartMs > 0  ? Date.now() - breakSegmentStartMs  : 0
     updateAppState({
       absenceElapsedMs: perAbsenceMs,
-      breakProgressMs:  absenceTotalMs + segmentMs,
+      breakProgressMs:  appState.isOnBreak ? absenceTotalMs + segmentMs : 0,
     })
   }
 }, 1000)

@@ -35,6 +35,7 @@ export interface AppState {
   absenceStartedAt: number | null
   absenceElapsedMs: number
   breakProgressMs: number
+  isOnBreak: boolean
   lastAbsenceDurationMs: number | null
   showWelcomeBack: boolean
 }

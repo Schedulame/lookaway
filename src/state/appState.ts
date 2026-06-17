@@ -15,6 +15,7 @@ let state: AppState = {
   absenceStartedAt: null,
   absenceElapsedMs: 0,
   breakProgressMs: 0,
+  isOnBreak: false,
   lastAbsenceDurationMs: null,
   showWelcomeBack: false,
 }
