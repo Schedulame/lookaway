@@ -178,11 +178,13 @@ on('AWAY_THRESHOLD_REACHED', ({ totalAwayMs }) => {
 
 // ── Eye timer events ───────────────────────────────────────────────────────────
 on('EYE_REMINDER_FIRED', () => {
+  const settings = getSettings()
+  const sec = Math.round(settings.eyeCountdownMs / 1000)
   recordEvent({ type: 'EYE_REMINDER_RECEIVED' })
   showNotification(
     NOTIFICATION_TAGS.EYE,
     '👁 Eye Break',
-    'Look at something 20 feet away for 20 seconds.',
+    `Look at something 20 feet away for ${sec} seconds.`,
     RE_NOTIFY_DELAY_MS
   )
   updateAppState({ eyeTimer: getEyeTimerState() })
@@ -206,11 +208,13 @@ on('EYE_COUNTDOWN_COMPLETE', () => {
 
 // ── Break timer events ─────────────────────────────────────────────────────────
 on('BREAK_REMINDER_FIRED', () => {
+  const settings = getSettings()
+  const min = Math.round(settings.breakIntervalMs / 60000)
   recordEvent({ type: 'BREAK_REMINDER_RECEIVED' })
   showNotification(
     NOTIFICATION_TAGS.BREAK,
     '☕ Time for a Break',
-    "You've been working for 90 minutes. Stand up and take a break!",
+    `You've been working for ${min} minutes. Stand up and take a break!`,
     RE_NOTIFY_DELAY_MS
   )
   updateAppState({ breakTimer: getBreakTimerState() })
@@ -240,10 +244,11 @@ on('NOTIFICATION_DISMISSED', ({ tag }) => {
 on('RE_NOTIFY', ({ tag }) => {
   incrementBadge()
   if (tag === NOTIFICATION_TAGS.EYE) {
+    const sec = Math.round(getSettings().eyeCountdownMs / 1000)
     showNotification(
       NOTIFICATION_TAGS.EYE,
       '👁 Eye Break — Still Waiting',
-      'Please look 20 feet away for 20 seconds!',
+      `Please look 20 feet away for ${sec} seconds!`,
       RE_NOTIFY_DELAY_MS
     )
   } else if (tag === NOTIFICATION_TAGS.BREAK) {
