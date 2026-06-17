@@ -44,6 +44,7 @@ export async function showNotification(
     body,
     tag,
     icon: '/favicon.svg',
+    requireInteraction: true,
   }
 
   // Use SW registration (bypasses macOS restrictions on timer-triggered notifications)

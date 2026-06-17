@@ -98,6 +98,6 @@ self.addEventListener('notificationclick', (event) => {
 self.addEventListener('notificationclose', (event) => {
   const tag = event.notification.tag
   self.clients
-    .matchAll({ type: 'window' })
+    .matchAll({ type: 'window', includeUncontrolled: true })
     .then((list) => list.forEach((c) => c.postMessage({ type: 'NOTIFICATION_CLOSED', tag })))
 })
