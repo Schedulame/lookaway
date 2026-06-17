@@ -137,10 +137,15 @@ on('FACE_PRESENT', ({ durationMs }) => {
 })
 
 on('FACE_ABSENT', () => {
-  absenceTotalMs = 0
   absenceActualStartMs = Date.now()
   eyeBreakRecordedThisAbsence = false
-  longBreakRecordedThisAbsence = false
+  // Preserve absenceTotalMs and longBreakRecordedThisAbsence during an ongoing
+  // long break session (NOTIFYING = break needed but not yet taken).
+  // Reset only when no break is pending so stale progress doesn't carry over.
+  if (getBreakTimerState().phase !== 'NOTIFYING') {
+    absenceTotalMs = 0
+    longBreakRecordedThisAbsence = false
+  }
   updateAppState({ facePresent: false })
   pauseEyeTimer()
   pauseBreakTimer()
@@ -212,6 +217,8 @@ on('BREAK_REMINDER_FIRED', () => {
 })
 
 on('BREAK_COMPLETED', () => {
+  absenceTotalMs = 0
+  longBreakRecordedThisAbsence = false
   recordEvent({ type: 'LONG_BREAK_COMPLETED' })
   clearBadge()
   updateAppState({ breakTimer: getBreakTimerState() })
