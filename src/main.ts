@@ -112,6 +112,12 @@ on('FACE_PRESENT', ({ durationMs }) => {
     recordEvent({ type: 'AWAY_TIME_ELAPSED', ms: exactAbsenceMs })
   }
 
+  // If returning during a long break session, save the partial absence so the
+  // progress ring resumes from the correct position on the next absence.
+  if (getBreakTimerState().phase === 'PAUSED') {
+    absenceTotalMs += getAbsenceDurationMs()
+  }
+
   updateAppState({
     facePresent: true,
     absenceElapsedMs: 0,
