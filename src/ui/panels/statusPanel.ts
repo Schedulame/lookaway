@@ -40,9 +40,12 @@ function renderEyeTimer(state: AppState): void {
     timeEl.textContent  = formatMinutes(eyeTimer.countdownRemainingMs)
     phaseEl.textContent = 'looking away'
   } else if (eyeTimer.phase === 'PAUSED') {
-    const remaining = Math.max(0, settings.eyeIntervalMs - eyeTimer.elapsedMs)
-    timeEl.textContent  = formatMinutes(remaining)
-    phaseEl.textContent = 'away'
+    const absenceMs = state.absenceElapsedMs
+    const progress  = Math.min(1, absenceMs / settings.eyeCountdownMs)
+    const remaining = Math.max(0, settings.eyeCountdownMs - absenceMs)
+    arcEl.setAttribute('stroke-dashoffset', String(EYE_C * (1 - progress)))
+    timeEl.textContent  = remaining > 0 ? formatMinutes(remaining) : 'done!'
+    phaseEl.textContent = 'eye break'
   } else {
     arcEl.setAttribute('stroke-dashoffset', String(EYE_C))
     timeEl.textContent  = '--:--'

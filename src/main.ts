@@ -1,5 +1,5 @@
 import './style.css'
-import { EYE_RESET_ABSENCE_MS, NOTIFICATION_TAGS, RE_NOTIFY_DELAY_MS, WELCOME_BACK_SHOW_MS } from './constants'
+import { NOTIFICATION_TAGS, RE_NOTIFY_DELAY_MS, WELCOME_BACK_SHOW_MS } from './constants'
 import { startCamera } from './camera/cameraManager'
 import { getAbsenceDurationMs } from './camera/facePresence'
 import {
@@ -113,7 +113,7 @@ on('FACE_PRESENT', ({ durationMs }) => {
     showWelcomeBack: durationMs >= settings.awayThresholdMs,
   })
 
-  if (durationMs >= EYE_RESET_ABSENCE_MS) {
+  if (durationMs >= settings.eyeCountdownMs) {
     if (!eyeBreakRecordedThisAbsence) {
       recordEvent({ type: 'EYE_BREAK_COMPLETED' })
     }
