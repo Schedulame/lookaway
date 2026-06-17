@@ -226,7 +226,6 @@ on('BREAK_REMINDER_FIRED', () => {
 
 on('BREAK_COMPLETED', () => {
   absenceTotalMs = 0
-  longBreakRecordedThisAbsence = false
   recordEvent({ type: 'LONG_BREAK_COMPLETED' })
   clearBadge()
   updateAppState({ isOnBreak: false, breakProgressMs: 0, breakTimer: getBreakTimerState() })
@@ -301,12 +300,21 @@ function renderNotifStatus(): void {
 setInterval(() => {
   const appState = getAppState()
   if (!appState.facePresent) {
-    const perAbsenceMs = absenceActualStartMs > 0 ? Date.now() - absenceActualStartMs : 0
-    const segmentMs    = breakSegmentStartMs > 0  ? Date.now() - breakSegmentStartMs  : 0
+    const perAbsenceMs  = absenceActualStartMs > 0 ? Date.now() - absenceActualStartMs : 0
+    const segmentMs     = breakSegmentStartMs > 0  ? Date.now() - breakSegmentStartMs  : 0
+    const breakProgress = appState.isOnBreak ? absenceTotalMs + segmentMs : 0
+
     updateAppState({
       absenceElapsedMs: perAbsenceMs,
-      breakProgressMs:  appState.isOnBreak ? absenceTotalMs + segmentMs : 0,
+      breakProgressMs:  breakProgress,
     })
+
+    if (appState.isOnBreak && !longBreakRecordedThisAbsence && breakProgress >= getSettings().minBreakDurationMs) {
+      longBreakRecordedThisAbsence = true
+      onLongAbsenceDetected()
+      dismissNotification(NOTIFICATION_TAGS.BREAK)
+      updateAppState({ breakTimer: getBreakTimerState() })
+    }
   }
 }, 1000)
 
