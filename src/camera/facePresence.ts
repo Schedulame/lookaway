@@ -1,5 +1,4 @@
 import { PRESENCE_ABSENT_FRAMES, PRESENCE_DETECT_FRAMES } from '../constants'
-import { getSettings } from '../state/settings'
 import { emit } from '../utils/eventBus'
 
 let presentCount = 0
@@ -34,14 +33,6 @@ export function onFaceAbsent(force = false): void {
       absenceStartedAt = Date.now()
       emit('FACE_ABSENT', { durationMs: 0 })
     }
-    if (!isPresent && absenceStartedAt !== null) {
-      const absenceDurationMs = Date.now() - absenceStartedAt
-      const settings = getSettings()
-      if (absenceDurationMs >= settings.awayThresholdMs) {
-        emit('AWAY_THRESHOLD_REACHED', { totalAwayMs: absenceDurationMs })
-        absenceStartedAt = Date.now() // reset to avoid repeated fires
-      }
-    }
   }
 }
 
@@ -49,17 +40,6 @@ export function onFaceRestored(): void {
   forcedAbsent = false
   presentCount = 0
   absentCount = 0
-}
-
-export function checkAwayThreshold(): void {
-  if (!isPresent && absenceStartedAt !== null) {
-    const absenceDurationMs = Date.now() - absenceStartedAt
-    const settings = getSettings()
-    if (absenceDurationMs >= settings.awayThresholdMs) {
-      emit('AWAY_THRESHOLD_REACHED', { totalAwayMs: absenceDurationMs })
-      absenceStartedAt = Date.now()
-    }
-  }
 }
 
 export function getAbsenceDurationMs(): number {

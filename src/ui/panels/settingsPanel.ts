@@ -23,8 +23,6 @@ export function initSettingsPanel(): void {
       breakIntervalMs: parse('breakIntervalMin', 1, 9999, current.breakIntervalMs / 60000) * 60000,
       minBreakDurationMs:
         parse('minBreakDurationMin', 1, 9999, current.minBreakDurationMs / 60000) * 60000,
-      awayThresholdMs:
-        parse('awayThresholdMin', 1, 9999, current.awayThresholdMs / 60000) * 60000,
     }
     saveSettings(next)
     showSaved()
@@ -37,7 +35,6 @@ function populateForm(): void {
   setVal('eyeCountdownSec', s.eyeCountdownMs / 1000)
   setVal('breakIntervalMin', s.breakIntervalMs / 60000)
   setVal('minBreakDurationMin', s.minBreakDurationMs / 60000)
-  setVal('awayThresholdMin', s.awayThresholdMs / 60000)
 }
 
 function setVal(id: string, val: number): void {

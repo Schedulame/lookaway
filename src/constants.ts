@@ -10,7 +10,6 @@ export const DEFAULTS: Settings = {
   eyeCountdownMs: 20 * 1000,
   breakIntervalMs: 90 * 60 * 1000,
   minBreakDurationMs: 10 * 60 * 1000,
-  awayThresholdMs: 5 * 60 * 1000,
 }
 
 export const RE_NOTIFY_DELAY_MS = 5 * 60 * 1000

@@ -12,7 +12,6 @@ export interface Settings {
   eyeCountdownMs: number
   breakIntervalMs: number
   minBreakDurationMs: number
-  awayThresholdMs: number
 }
 
 export interface DayStats {
@@ -53,7 +52,6 @@ export type StatEvent =
 export type EventMap = {
   FACE_PRESENT: { durationMs: number }
   FACE_ABSENT: { durationMs: number }
-  AWAY_THRESHOLD_REACHED: { totalAwayMs: number }
   NOTIFICATION_DISMISSED: { tag: string }
   SETTINGS_CHANGED: Settings
   TIMER_TICK: { deltaMs: number }

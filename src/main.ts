@@ -81,7 +81,7 @@ subscribeAppState((state) => {
 
 // ── Absence tracking ───────────────────────────────────────────────────────────
 let absenceTotalMs = 0        // cumulative break progress (across absences)
-let breakSegmentStartMs = 0   // start of current absence segment (reset on FACE_ABSENT and AWAY_THRESHOLD_REACHED)
+let breakSegmentStartMs = 0   // start of current absence segment
 let absenceActualStartMs = 0  // true absence start (for exact away time stats)
 let eyeBreakRecordedThisAbsence = false
 let longBreakRecordedThisAbsence = false
@@ -108,7 +108,7 @@ on('FACE_PRESENT', ({ durationMs }) => {
 
   const exactAbsenceMs = absenceActualStartMs > 0 ? Date.now() - absenceActualStartMs : 0
 
-  if (exactAbsenceMs >= settings.awayThresholdMs) {
+  if (exactAbsenceMs >= settings.eyeCountdownMs) {
     recordEvent({ type: 'AWAY_TIME_ELAPSED', ms: exactAbsenceMs })
   }
 
@@ -121,7 +121,7 @@ on('FACE_PRESENT', ({ durationMs }) => {
     absenceElapsedMs: 0,
     breakProgressMs: absenceTotalMs,
     lastAbsenceDurationMs: durationMs > 0 ? durationMs : null,
-    showWelcomeBack: durationMs >= settings.awayThresholdMs,
+    showWelcomeBack: durationMs >= settings.eyeCountdownMs,
   })
 
   if (durationMs >= settings.eyeCountdownMs) {
@@ -154,30 +154,6 @@ on('FACE_ABSENT', () => {
   pauseBreakTimer()
   worker.postMessage({ type: 'PAUSE' })
   updateAppState({ eyeTimer: getEyeTimerState(), breakTimer: getBreakTimerState() })
-})
-
-on('AWAY_THRESHOLD_REACHED', ({ totalAwayMs }) => {
-  absenceTotalMs += totalAwayMs
-  breakSegmentStartMs = Date.now()
-
-  const settings = getSettings()
-
-  if (!longBreakRecordedThisAbsence && absenceTotalMs >= settings.minBreakDurationMs) {
-    longBreakRecordedThisAbsence = true
-    onLongAbsenceDetected()
-    dismissNotification(NOTIFICATION_TAGS.BREAK)
-    updateAppState({ breakTimer: getBreakTimerState() })
-  }
-
-  if (!eyeBreakRecordedThisAbsence) {
-    eyeBreakRecordedThisAbsence = true
-    recordEvent({ type: 'EYE_BREAK_COMPLETED' })
-  }
-  resetEyeTimer()
-  dismissNotification(NOTIFICATION_TAGS.EYE)
-  hideOverlay()
-  clearBadge()
-  updateAppState({ eyeTimer: getEyeTimerState() })
 })
 
 // ── Eye timer events ───────────────────────────────────────────────────────────

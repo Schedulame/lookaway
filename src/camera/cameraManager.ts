@@ -1,7 +1,7 @@
 import { FaceDetector, FilesetResolver } from '@mediapipe/tasks-vision'
 import { FACE_DETECTION_INTERVAL_MS } from '../constants'
 import { updateAppState } from '../state/appState'
-import { checkAwayThreshold, onFaceAbsent, onFaceDetected } from './facePresence'
+import { onFaceAbsent, onFaceDetected } from './facePresence'
 
 let detector: FaceDetector | null = null
 let videoEl: HTMLVideoElement | null = null
@@ -78,5 +78,4 @@ function detect(): void {
   } catch {
     onFaceAbsent()
   }
-  checkAwayThreshold()
 }
