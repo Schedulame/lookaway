@@ -39,7 +39,6 @@ export function renderStatsPanel(): void {
     const eyeDone  = todayData.eyeBreaksCompleted
     const eyeMiss  = todayData.eyeBreaksSkipped
     const lbDone   = todayData.longBreaksCompleted
-    const lbMiss   = todayData.longBreaksSkipped
 
     html += `
       <div class="stats-card">
