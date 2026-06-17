@@ -80,6 +80,11 @@ subscribeAppState((state) => {
   mainChar?.setEyeAlert(state.eyeTimer.phase === 'NOTIFYING')
 })
 
+// ── Absence tracking (for per-absence deduplication of stats) ─────────────────
+let absenceTotalMs = 0
+let eyeBreakRecordedThisAbsence = false
+let longBreakRecordedThisAbsence = false
+
 // ── Web Worker timer ───────────────────────────────────────────────────────────
 const worker = new TimerWorker()
 
@@ -107,6 +112,10 @@ on('FACE_PRESENT', ({ durationMs }) => {
   })
 
   if (durationMs >= EYE_RESET_ABSENCE_MS) {
+    if (!eyeBreakRecordedThisAbsence) {
+      recordEvent({ type: 'EYE_BREAK_COMPLETED' })
+    }
+    eyeBreakRecordedThisAbsence = false
     resetEyeTimer()
   } else {
     resumeEyeTimer()
@@ -120,6 +129,9 @@ on('FACE_PRESENT', ({ durationMs }) => {
 })
 
 on('FACE_ABSENT', () => {
+  absenceTotalMs = 0
+  eyeBreakRecordedThisAbsence = false
+  longBreakRecordedThisAbsence = false
   updateAppState({ facePresent: false })
   pauseEyeTimer()
   pauseBreakTimer()
@@ -128,16 +140,22 @@ on('FACE_ABSENT', () => {
 })
 
 on('AWAY_THRESHOLD_REACHED', ({ totalAwayMs }) => {
+  absenceTotalMs += totalAwayMs
   recordEvent({ type: 'AWAY_TIME_ELAPSED', ms: totalAwayMs })
 
   const settings = getSettings()
 
-  if (totalAwayMs >= settings.minBreakDurationMs) {
+  if (!longBreakRecordedThisAbsence && absenceTotalMs >= settings.minBreakDurationMs) {
+    longBreakRecordedThisAbsence = true
     onLongAbsenceDetected()
     dismissNotification(NOTIFICATION_TAGS.BREAK)
     updateAppState({ breakTimer: getBreakTimerState() })
   }
 
+  if (!eyeBreakRecordedThisAbsence) {
+    eyeBreakRecordedThisAbsence = true
+    recordEvent({ type: 'EYE_BREAK_COMPLETED' })
+  }
   resetEyeTimer()
   dismissNotification(NOTIFICATION_TAGS.EYE)
   hideOverlay()

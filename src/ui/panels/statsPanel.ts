@@ -37,7 +37,6 @@ export function renderStatsPanel(): void {
     const activeH  = (todayData.totalActiveMs / 3600000).toFixed(1)
     const awayH    = (todayData.totalAwayMs   / 3600000).toFixed(1)
     const eyeDone  = todayData.eyeBreaksCompleted
-    const eyeMiss  = todayData.eyeBreaksSkipped
     const lbDone   = todayData.longBreaksCompleted
 
     html += `
@@ -49,16 +48,16 @@ export function renderStatsPanel(): void {
             <span class="stat-label">Eye breaks</span>
           </div>
           <div class="stat-cell">
-            <span class="stat-value stat-value--muted">${eyeMiss}</span>
-            <span class="stat-label">Missed</span>
-          </div>
-          <div class="stat-cell">
             <span class="stat-value stat-value--break">${lbDone}</span>
             <span class="stat-label">Long breaks</span>
           </div>
           <div class="stat-cell">
             <span class="stat-value">${activeH}h</span>
-            <span class="stat-label">Active · ${awayH}h away</span>
+            <span class="stat-label">Active</span>
+          </div>
+          <div class="stat-cell">
+            <span class="stat-value">${awayH}h</span>
+            <span class="stat-label">Away</span>
           </div>
         </div>
       </div>
