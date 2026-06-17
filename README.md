@@ -12,7 +12,17 @@ A browser-based eye health tool that reminds you to follow the **20-20-20 rule**
 
 ## Tech
 
-Vanilla TypeScript + Vite, no framework. WebGL background via [OGL](https://github.com/oframe/ogl). Face detection via MediaPipe. Document Picture-in-Picture API for the float widget.
+Vanilla TypeScript + Vite, no framework. WebGL background via [OGL](https://github.com/oframe/ogl). Face detection via MediaPipe. Document Picture-in-Picture API for the float widget. Progressive Web App with offline support.
+
+## Install as app
+
+Lookaway is a PWA — you can install it directly from the browser:
+
+- **Chrome / Edge (desktop):** click the install icon in the address bar
+- **Android:** tap "Add to Home Screen" from the browser menu
+- **iOS Safari:** tap the share icon → "Add to Home Screen"
+
+Once installed, the app works offline and behaves like a native app.
 
 ## Run locally
 
