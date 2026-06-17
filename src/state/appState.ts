@@ -13,6 +13,7 @@ let state: AppState = {
   eyeTimer: idleTimer(),
   breakTimer: idleTimer(),
   absenceStartedAt: null,
+  absenceElapsedMs: 0,
   lastAbsenceDurationMs: null,
   showWelcomeBack: false,
 }

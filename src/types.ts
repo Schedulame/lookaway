@@ -33,6 +33,7 @@ export interface AppState {
   eyeTimer: TimerState
   breakTimer: TimerState
   absenceStartedAt: number | null
+  absenceElapsedMs: number
   lastAbsenceDurationMs: number | null
   showWelcomeBack: boolean
 }

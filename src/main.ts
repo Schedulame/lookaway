@@ -1,6 +1,7 @@
 import './style.css'
 import { EYE_RESET_ABSENCE_MS, NOTIFICATION_TAGS, RE_NOTIFY_DELAY_MS, WELCOME_BACK_SHOW_MS } from './constants'
 import { startCamera } from './camera/cameraManager'
+import { getAbsenceDurationMs } from './camera/facePresence'
 import {
   dismissNotification,
   requestPermission,
@@ -107,6 +108,7 @@ on('FACE_PRESENT', ({ durationMs }) => {
 
   updateAppState({
     facePresent: true,
+    absenceElapsedMs: 0,
     lastAbsenceDurationMs: durationMs > 0 ? durationMs : null,
     showWelcomeBack: durationMs >= settings.awayThresholdMs,
   })
@@ -279,6 +281,13 @@ function renderNotifStatus(): void {
     })
   }
 }
+
+// ── Live absence timer (updates absenceElapsedMs every second while away) ─────
+setInterval(() => {
+  if (!getAppState().facePresent) {
+    updateAppState({ absenceElapsedMs: absenceTotalMs + getAbsenceDurationMs() })
+  }
+}, 1000)
 
 // ── Camera + startup ───────────────────────────────────────────────────────────
 async function init() {
