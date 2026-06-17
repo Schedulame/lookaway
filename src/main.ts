@@ -1,7 +1,6 @@
 import './style.css'
 import { NOTIFICATION_TAGS, RE_NOTIFY_DELAY_MS, WELCOME_BACK_SHOW_MS } from './constants'
 import { startCamera } from './camera/cameraManager'
-import { getAbsenceDurationMs } from './camera/facePresence'
 import {
   dismissNotification,
   requestPermission,
@@ -80,9 +79,10 @@ subscribeAppState((state) => {
   mainChar?.setEyeAlert(state.eyeTimer.phase === 'NOTIFYING')
 })
 
-// ── Absence tracking (for per-absence deduplication of stats) ─────────────────
-let absenceTotalMs = 0
-let absenceActualStartMs = 0
+// ── Absence tracking ───────────────────────────────────────────────────────────
+let absenceTotalMs = 0        // cumulative break progress (across absences)
+let breakSegmentStartMs = 0   // start of current absence segment (reset on FACE_ABSENT and AWAY_THRESHOLD_REACHED)
+let absenceActualStartMs = 0  // true absence start (for exact away time stats)
 let eyeBreakRecordedThisAbsence = false
 let longBreakRecordedThisAbsence = false
 
@@ -112,15 +112,14 @@ on('FACE_PRESENT', ({ durationMs }) => {
     recordEvent({ type: 'AWAY_TIME_ELAPSED', ms: exactAbsenceMs })
   }
 
-  // If returning during a long break session, save the partial absence so the
-  // progress ring resumes from the correct position on the next absence.
-  if (getBreakTimerState().phase === 'PAUSED') {
-    absenceTotalMs += getAbsenceDurationMs()
+  if (getBreakTimerState().phase === 'PAUSED' && breakSegmentStartMs > 0) {
+    absenceTotalMs += Date.now() - breakSegmentStartMs
   }
 
   updateAppState({
     facePresent: true,
     absenceElapsedMs: 0,
+    breakProgressMs: absenceTotalMs,
     lastAbsenceDurationMs: durationMs > 0 ? durationMs : null,
     showWelcomeBack: durationMs >= settings.awayThresholdMs,
   })
@@ -144,10 +143,8 @@ on('FACE_PRESENT', ({ durationMs }) => {
 
 on('FACE_ABSENT', () => {
   absenceActualStartMs = Date.now()
+  breakSegmentStartMs = Date.now()
   eyeBreakRecordedThisAbsence = false
-  // Preserve absenceTotalMs and longBreakRecordedThisAbsence during an ongoing
-  // long break session (NOTIFYING = break needed but not yet taken).
-  // Reset only when no break is pending so stale progress doesn't carry over.
   if (getBreakTimerState().phase !== 'NOTIFYING') {
     absenceTotalMs = 0
     longBreakRecordedThisAbsence = false
@@ -161,6 +158,7 @@ on('FACE_ABSENT', () => {
 
 on('AWAY_THRESHOLD_REACHED', ({ totalAwayMs }) => {
   absenceTotalMs += totalAwayMs
+  breakSegmentStartMs = Date.now()
 
   const settings = getSettings()
 
@@ -231,7 +229,7 @@ on('BREAK_COMPLETED', () => {
   longBreakRecordedThisAbsence = false
   recordEvent({ type: 'LONG_BREAK_COMPLETED' })
   clearBadge()
-  updateAppState({ breakTimer: getBreakTimerState() })
+  updateAppState({ breakProgressMs: 0, breakTimer: getBreakTimerState() })
 })
 
 
@@ -299,10 +297,15 @@ function renderNotifStatus(): void {
   }
 }
 
-// ── Live absence timer (updates absenceElapsedMs every second while away) ─────
+// ── Live absence timers (update every second while away) ───────────────────────
 setInterval(() => {
   if (!getAppState().facePresent) {
-    updateAppState({ absenceElapsedMs: absenceTotalMs + getAbsenceDurationMs() })
+    const perAbsenceMs = absenceActualStartMs > 0 ? Date.now() - absenceActualStartMs : 0
+    const segmentMs    = breakSegmentStartMs > 0  ? Date.now() - breakSegmentStartMs  : 0
+    updateAppState({
+      absenceElapsedMs: perAbsenceMs,
+      breakProgressMs:  absenceTotalMs + segmentMs,
+    })
   }
 }, 1000)
 

@@ -14,6 +14,7 @@ let state: AppState = {
   breakTimer: idleTimer(),
   absenceStartedAt: null,
   absenceElapsedMs: 0,
+  breakProgressMs: 0,
   lastAbsenceDurationMs: null,
   showWelcomeBack: false,
 }

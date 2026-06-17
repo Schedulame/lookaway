@@ -34,6 +34,7 @@ export interface AppState {
   breakTimer: TimerState
   absenceStartedAt: number | null
   absenceElapsedMs: number
+  breakProgressMs: number
   lastAbsenceDurationMs: number | null
   showWelcomeBack: boolean
 }

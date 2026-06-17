@@ -76,9 +76,9 @@ function renderBreakTimer(state: AppState): void {
     timeEl.textContent  = 'now!'
     phaseEl.textContent = 'take a break'
   } else if (breakTimer.phase === 'PAUSED') {
-    const absenceMs  = state.absenceElapsedMs
-    const progress   = Math.min(1, absenceMs / settings.minBreakDurationMs)
-    const remaining  = Math.max(0, settings.minBreakDurationMs - absenceMs)
+    const progressMs = state.breakProgressMs
+    const progress   = Math.min(1, progressMs / settings.minBreakDurationMs)
+    const remaining  = Math.max(0, settings.minBreakDurationMs - progressMs)
     arcEl.setAttribute('stroke-dashoffset', String(BREAK_C * (1 - progress)))
     timeEl.textContent  = remaining > 0 ? formatDuration(remaining) : 'done!'
     phaseEl.textContent = 'on break'
